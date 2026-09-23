@@ -1,0 +1,56 @@
+terraform {
+  required_providers {
+    airtelcloud = {
+      source  = "Airtel-Cloud-Platform/airtelcloud"
+      version = ">= 1.2.6"
+    }
+  }
+}
+
+provider "airtelcloud" {
+  api_endpoint = "https://south.cloud.airtel.in"
+  api_key      = var.airtel_api_key
+  api_secret   = var.airtel_api_secret
+  region       = "south"
+  organization = var.organization
+  project_name = var.project_name
+}
+
+module "asg" {
+  source = "../../"
+
+  name              = "${var.resource_prefix}-asg"
+  vpc_name          = "copper-vpc1"
+  subnet            = "proxy-test-subnet"
+  availability_zone = "S1"
+
+  flavor_name          = "ccd.Large"
+  image_name           = "Ubuntu22_04_Sep2026"
+  security_group_names = ["akash-122"]
+#  keypair_name         = "keypair-1"
+
+  minimum_size  = 1
+  maximum_size  = 3
+  desired_count = 1
+
+  scale_up_step_size   = 1
+  scale_down_step_size = 1
+  scaling_interval     = 2
+  cooloff_period       = 10
+  termination_policy   = "oldest"
+  drain_period         = 0
+
+  scaleup_rules = [{
+    metric_type      = "cpu"
+    aggregation_type = "avg"
+    target_value     = 60
+  }]
+
+  scaledown_rules = [{
+    metric_type      = "cpu"
+    aggregation_type = "avg"
+    target_value     = 30
+  }]
+
+  labels = ["app", "production"]
+}
