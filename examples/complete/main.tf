@@ -55,21 +55,20 @@ module "asg" {
   labels    = ["app", "production"]
   disk_size = 100
 
-  load_balancer = {
-    name                  = "testviveklbs117sep"
-    host_name             = "${var.resource_prefix}-asg-vs"
-    vip                   = "10.29.15.124"
-    protocol              = "TCP"
-    port                  = 1234
-    routing_algorithm     = "ROUND_ROBIN"
-    pool_name             = "ash-pool"
-    pool_port             = 12
-    max_connections       = 100
-    health_check_interval = 5
-    health_check_timeout  = 16
-    pool_monitor_protocol = "TCP"
-    enable_persistance    = false
-  }
+  # Load balancer attachment uses separate inputs. All are required together.
+  load_balancer_name    = "testviveklbs117sep"
+  host_name             = "${var.resource_prefix}-asg-vs"
+  vip                   = "10.29.15.124"
+  protocol              = "TCP"
+  port                  = 1234
+  routing_algorithm     = "ROUND_ROBIN"
+  pool_name             = "ash-pool"
+  pool_port             = 12
+  max_connections       = 100
+  health_check_interval = 5
+  health_check_timeout  = 16
+  pool_monitor_protocol = "TCP"
+  enable_persistance    = false
 
   timeouts = {
     create = "30m"

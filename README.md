@@ -11,7 +11,7 @@ Create, read, import, and delete are supported. Changing configuration forces a 
 - Image by ID, name, or snapshot name
 - Security group by ID or name
 - Optional SSH keypair
-- Optional load balancer virtual-server attachment
+- Optional load balancer virtual-server attachment through separate inputs
 - Optional labels, boot disk size, and timeouts
 
 ## Requirements
@@ -102,21 +102,19 @@ module "asg" {
     target_value     = 30
   }]
 
-  load_balancer = {
-    name                    = "south-lb"
-    host_name               = "app-asg-vs"
-    vip                     = "10.29.16.10"
-    protocol                = "TCP"
-    port                    = 1234
-    routing_algorithm       = "ROUND_ROBIN"
-    pool_name               = "ash-pool"
-    pool_port               = 12
-    max_connections         = 100
-    health_check_interval   = 5
-    health_check_timeout    = 16
-    pool_monitor_protocol   = "TCP"
-    enable_persistance      = false
-  }
+  load_balancer_name    = "south-lb"
+  host_name             = "app-asg-vs"
+  vip                   = "10.29.16.10"
+  protocol              = "TCP"
+  port                  = 1234
+  routing_algorithm     = "ROUND_ROBIN"
+  pool_name             = "ash-pool"
+  pool_port             = 12
+  max_connections       = 100
+  health_check_interval = 5
+  health_check_timeout  = 16
+  pool_monitor_protocol = "TCP"
+  enable_persistance    = false
 }
 ```
 
@@ -148,10 +146,23 @@ module "asg" {
 | security_group_names | One security group name | list(string) | No |
 | keypair_id | Keypair UUID | string | No |
 | keypair_name | Keypair name | string | No |
-| disk_size | Boot volume size in GB | number | No |
+| disk_size | Boot volume size in GB. Minimum 20. Defaults to 100, or 200 for Windows images | number | No |
 | labels | Labels to assign | list(string) | No |
-| load_balancer | Existing LB virtual-server attachment | object | No |
-| timeouts | Create and delete timeouts | object | No |
+| load_balancer_name | Existing load balancer service name. Requires every input below except `enable_persistance` | string | No |
+| host_name | Virtual server name | string | With load balancer |
+| vip | VIP on the load balancer service network | string | With load balancer |
+| protocol | Listener protocol, such as `TCP` | string | With load balancer |
+| port | Listener port | number | With load balancer |
+| routing_algorithm | Pool algorithm, such as `ROUND_ROBIN` | string | With load balancer |
+| pool_name | Pool name | string | With load balancer |
+| pool_port | Member port | number | With load balancer |
+| max_connections | Maximum connections per member | number | With load balancer |
+| health_check_interval | Health-check interval in seconds (at least 1) | number | With load balancer |
+| health_check_timeout | Health-check timeout in seconds (at least 1) | number | With load balancer |
+| pool_monitor_protocol | Health monitor protocol, such as `TCP` | string | With load balancer |
+| enable_persistance | Session persistence. Defaults to `false` | bool | No |
+| load_balancer | Deprecated. Use the separate inputs above. Cannot be combined with them | object | No |
+| timeouts | Create and delete timeouts. The provider default is 15 minutes each | object | No |
 
 Exactly one of `flavor_id` or `flavor_name` is required. Exactly one of `image_id`, `image_name`, or `snapshot_name` is required. Exactly one of `security_group_ids` or `security_group_names` is required.
 
@@ -167,13 +178,21 @@ Exactly one of `flavor_id` or `flavor_name` is required. Exactly one of `image_i
 | flavor_id | Resolved flavor ID |
 | image_id | Resolved image ID |
 | os_type | Image OS family |
+| disk_size | Boot volume size in GB |
+| security_group_ids | Security group ID attached to the group |
+| keypair_id | Keypair UUID, if one is used |
+| load_balancer_name | Attached load balancer name, or null |
 | asg | Selected attributes for downstream modules |
 
 ## Notes
 
-- Configuration changes force a new group.
+- Configuration changes force a new group. Only `timeouts` can change in place.
 - `desired_count` must equal `minimum_size`, and `minimum_size` must be less than `maximum_size`.
-- Each `scaleup_rules` metric must appear in `scaledown_rules` with the same `aggregation_type` and a lower `target_value`.
+- Every `scaleup_rules` metric must appear in `scaledown_rules` with the same `aggregation_type` and a lower `target_value`, and every `scaledown_rules` metric must appear in `scaleup_rules`.
 - When `snapshot_name` is set, `keypair_id` or `keypair_name` is required.
-- When `load_balancer` is set, the VIP comes from the load balancer service network, not the ASG subnet.
+- Load balancer attachment uses separate inputs: `load_balancer_name`, `host_name`, `vip`, `protocol`, `port`, `routing_algorithm`, `pool_name`, `pool_port`, `max_connections`, `health_check_interval`, `health_check_timeout`, and `pool_monitor_protocol`. Set all of them or none. `enable_persistance` is optional. The nested `load_balancer` object still works but is deprecated, and it cannot be combined with the separate inputs.
+- The VIP comes from the load balancer service network, not the ASG subnet.
+- `disk_size` has a minimum of 20 GB. It defaults to 100 GB, or 200 GB for Windows images.
+- The default create and delete timeout is 15 minutes. Set `timeouts` to change it, for example `{ create = "20m", delete = "20m" }`.
+- Destroying a group that has a load balancer deletes its virtual server first, then the group. Importing an existing group recovers its network, security group, keypair, and load balancer settings. Both need a provider release that includes the fixes from the `fix/asg-import-lb-delete-20261117` branch.
 - The `enable_persistance` field name matches the API spelling.

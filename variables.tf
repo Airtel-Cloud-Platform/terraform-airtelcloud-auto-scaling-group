@@ -190,6 +190,15 @@ variable "scaledown_rules" {
     ])
     error_message = "Each scaleup_rules metric_type must appear in scaledown_rules with the same aggregation_type and a lower target_value."
   }
+
+  validation {
+    condition = alltrue([
+      for down in var.scaledown_rules : anytrue([
+        for up in var.scaleup_rules : up.metric_type == down.metric_type
+      ])
+    ])
+    error_message = "Each scaledown_rules metric_type must also appear in scaleup_rules."
+  }
 }
 
 #########################################
@@ -314,8 +323,104 @@ variable "labels" {
   default     = null
 }
 
+#########################################
+# Load balancer attachment (optional)
+#########################################
+# Load balancer attachment uses separate inputs. Set load_balancer_name together
+# with every other input in this section (enable_persistance is optional), or set
+# none of them. The VIP is resolved from the load balancer service network, not
+# the autoscaling-group subnet.
+
+variable "load_balancer_name" {
+  description = "Existing load balancer service name. When set, host_name, vip, protocol, port, routing_algorithm, pool_name, pool_port, max_connections, health_check_interval, health_check_timeout, and pool_monitor_protocol are all required. Forces a new resource."
+  type        = string
+  default     = null
+}
+
+variable "host_name" {
+  description = "Virtual server name. Requires load_balancer_name. Forces a new resource."
+  type        = string
+  default     = null
+}
+
+variable "vip" {
+  description = "VIP address on the load balancer service network. Requires load_balancer_name. Forces a new resource."
+  type        = string
+  default     = null
+}
+
+variable "protocol" {
+  description = "Listener protocol, such as TCP. Requires load_balancer_name. Forces a new resource."
+  type        = string
+  default     = null
+}
+
+variable "port" {
+  description = "Listener port. Requires load_balancer_name. Forces a new resource."
+  type        = number
+  default     = null
+}
+
+variable "routing_algorithm" {
+  description = "Pool algorithm, such as ROUND_ROBIN. Requires load_balancer_name. Forces a new resource."
+  type        = string
+  default     = null
+}
+
+variable "pool_name" {
+  description = "Pool name. Requires load_balancer_name. Forces a new resource."
+  type        = string
+  default     = null
+}
+
+variable "pool_port" {
+  description = "Member port. Requires load_balancer_name. Forces a new resource."
+  type        = number
+  default     = null
+}
+
+variable "max_connections" {
+  description = "Maximum connections per member. Requires load_balancer_name. Forces a new resource."
+  type        = number
+  default     = null
+}
+
+variable "health_check_interval" {
+  description = "Health-check interval in seconds. At least 1. Requires load_balancer_name. Forces a new resource."
+  type        = number
+  default     = null
+
+  validation {
+    condition     = var.health_check_interval == null || var.health_check_interval >= 1
+    error_message = "health_check_interval must be at least 1."
+  }
+}
+
+variable "health_check_timeout" {
+  description = "Health-check timeout in seconds. At least 1. Requires load_balancer_name. Forces a new resource."
+  type        = number
+  default     = null
+
+  validation {
+    condition     = var.health_check_timeout == null || var.health_check_timeout >= 1
+    error_message = "health_check_timeout must be at least 1."
+  }
+}
+
+variable "pool_monitor_protocol" {
+  description = "Health monitor protocol, such as TCP. Requires load_balancer_name. Forces a new resource."
+  type        = string
+  default     = null
+}
+
+variable "enable_persistance" {
+  description = "Session persistence for the virtual server. The spelling matches the provider and API. Forces a new resource."
+  type        = bool
+  default     = false
+}
+
 variable "load_balancer" {
-  description = "Optional attachment to an existing load balancer service. The VIP is resolved from the load balancer service network, not the autoscaling-group subnet. Forces a new resource."
+  description = "Deprecated: use load_balancer_name, host_name, vip, protocol, port, and the other separate inputs instead. Optional attachment to an existing load balancer service, kept so existing callers keep working. Cannot be combined with the separate inputs. Forces a new resource."
 
   type = object({
     name                  = string
@@ -347,8 +452,12 @@ variable "load_balancer" {
   }
 }
 
+#########################################
+# Timeouts
+#########################################
+
 variable "timeouts" {
-  description = "Create and delete timeouts for the autoscaling group. Defaults to 15 minutes in the provider."
+  description = "Create and delete timeouts as durations, such as 20m. The provider default is 15 minutes each. A group normally becomes ready and deletes in under a minute."
 
   type = object({
     create = optional(string)

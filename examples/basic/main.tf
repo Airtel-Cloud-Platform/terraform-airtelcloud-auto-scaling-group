@@ -27,7 +27,7 @@ module "asg" {
   flavor_name          = "ccd.Large"
   image_name           = "Ubuntu22_04_Sep2026"
   security_group_names = ["akash-122"]
-#  keypair_name         = "keypair-1"
+  #  keypair_name         = "keypair-1"
 
   minimum_size  = 1
   maximum_size  = 3
